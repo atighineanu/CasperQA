@@ -1,0 +1,26 @@
+{
+  "Admin":
+    {
+    "User": "root",
+    "IP": "10.17.1.0",
+    "Pass": "linux" 
+    },
+  "Master":
+    {
+    "User": "root",
+    "IP": "10.17.2.0",
+    "Pass": "linux" 
+    },
+  "Worker1":
+    {
+    "User": "root",
+    "IP": "10.17.3.0",
+    "Pass": "linux" 
+    },
+  "Worker2":
+    {
+    "User": "root",
+    "IP": "10.17.3.1",
+    "Pass": "linux" 
+    }
+}
