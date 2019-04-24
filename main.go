@@ -115,8 +115,22 @@ func AdminOrchestrator(Node Configuration) {
 		}
 	*/
 
+	//------------Refresh Salt Grains
 	out1 := SimpleShellExec(Node, []string{"saltutil.refresh_grains"}, "alias")
 	fmt.Println(out1)
+	//------------Registering Nodes
+	//out1 = SimpleShellExec(Node, []string{"cmd.run", "'transactional-update", "register", "-r", +configuration.Key+"'"}, "alias")
+	//fmt.Println(out1)
+	//------------Disabling Update.Timer
+	//out1 = SimpleShellExec(Node, []string{"cmd.run", "'systemctl", "disable", "--now", "transactional-update.timer'"}, "alias")
+	//fmt.Println(out1)
+
+	//out1 = SimpleShellExec(Node, []string{"cmd.run", "'/usr/sbin/transactional-update", "cleanup", "dup", "salt'"}, "alias")
+	//fmt.Println(out1)
+
+	out1 = SimpleShellExec(Node, []string{"saltutil.refresh_grains"}, "alias")
+	fmt.Println(out1)
+
 }
 
 func main() {
