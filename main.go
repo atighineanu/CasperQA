@@ -90,7 +90,7 @@ func SimpleShellExec(Node Configuration, cmd []string, flag string) string {
 
 func AdminOrchestrator(Node Configuration) {
 
-	//------------------when puttin alias into .bashrc/// OBSOLETE-----------------------------------
+	//------------------when puttin' alias into .bashrc===> OBSOLETE-----------------------------------
 	/*
 			expr := []byte("alias salt-cluster='docker exec $(docker ps -q --filter name=salt-master) salt -P \"roles:admin|kube-master|kube-minion\"'")
 			var f *os.File
@@ -118,19 +118,22 @@ func AdminOrchestrator(Node Configuration) {
 	//------------Refresh Salt Grains
 	out1 := SimpleShellExec(Node, []string{"saltutil.refresh_grains"}, "alias")
 	fmt.Println(out1)
+
 	//------------Registering Nodes
 	//out1 = SimpleShellExec(Node, []string{"cmd.run", "'transactional-update", "register", "-r", +configuration.Key+"'"}, "alias")
 	//fmt.Println(out1)
+
 	//------------Disabling Update.Timer
 	//out1 = SimpleShellExec(Node, []string{"cmd.run", "'systemctl", "disable", "--now", "transactional-update.timer'"}, "alias")
 	//fmt.Println(out1)
 
+	//----------------Updating With Salt
 	//out1 = SimpleShellExec(Node, []string{"cmd.run", "'/usr/sbin/transactional-update", "cleanup", "dup", "salt'"}, "alias")
 	//fmt.Println(out1)
 
+	//------------------Refreshing Grains Again...
 	out1 = SimpleShellExec(Node, []string{"saltutil.refresh_grains"}, "alias")
 	fmt.Println(out1)
-
 }
 
 func main() {
