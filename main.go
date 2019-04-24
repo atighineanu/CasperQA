@@ -68,44 +68,54 @@ func (s *SSHInfo) Command(cmd ...string) *exec.Cmd {
 	return exec.Command("ssh", arg...)
 }
 
-func SimpleShellExec(Node Configuration, cmd []string) string {
-	out, err := Node.Admin.Command(cmd...).CombinedOutput()
-	if err != nil {
-		fmt.Println("This is bad! ", cmd, "didn't work:", err)
+func SimpleShellExec(Node Configuration, cmd []string, flag string) string {
+	var out []byte
+	if flag == "alias" {
+		withalias := append(
+			[]string{"docker", "exec", "$(docker ps -q --filter name=salt-master)", "salt", "-P", "\"roles:admin|kube-master|kube-minion\""}, cmd...)
+		out, err := Node.Admin.Command(withalias...).CombinedOutput()
+		if err != nil {
+			fmt.Println("This is bad! ", cmd, "didn't work:", err)
+		}
+		fmt.Printf("%s", string(out))
+	} else {
+		out, err := Node.Admin.Command(cmd...).CombinedOutput()
+		if err != nil {
+			fmt.Println("This is bad! ", cmd, "didn't work:", err)
+		}
+		fmt.Printf("%s", string(out))
 	}
 	return fmt.Sprintf("%s", out)
 }
 
 func AdminOrchestrator(Node Configuration) {
 
-	expr := []byte("alias salt-cluster='docker exec $(docker ps -q --filter name=salt-master) salt -P \"roles:admin|kube-master|kube-minion\"'")
-	var f *os.File
-	f, err := os.Create("temp")
-	if err != nil {
-		log.Fatalf("couldn't create the file...%s", err)
-	}
-	f.Write(expr)
-	f.Close()
+	//------------------when puttin alias into .bashrc/// OBSOLETE-----------------------------------
+	/*
+			expr := []byte("alias salt-cluster='docker exec $(docker ps -q --filter name=salt-master) salt -P \"roles:admin|kube-master|kube-minion\"'")
+			var f *os.File
+			f, err := os.Create("temp")
+			if err != nil {
+				log.Fatalf("couldn't create the file...%s", err)
+			}
+			f.Write(expr)
+			f.Close()
+			out, err := exec.Command("scp", "-o", "StrictHostKeyChecking=no", "temp", Node.Admin.User+"@"+Node.Admin.IP+":/root/.bashrc").CombinedOutput()
+			fmt.Println(fmt.Sprintf("%s", string(out)))
+			err = os.Remove("temp")
+			if err != nil {
+				fmt.Printf("Bad! couldn't delete the temp file: %s", err)
+			}
+			fmt.Println(SimpleShellExec(Node, []string{"source", ".bashrc"}))
+		out1 := SimpleShellExec(Node, []string{"alias"})
+		if !(strings.Contains(out1, "name=salt-master")) {
+			fmt.Println("Bad!")
+		} else {
+			fmt.Println("alias is set fine...")
+		}
+	*/
 
-	out, err := exec.Command("scp", "-o", "StrictHostKeyChecking=no", "temp", Node.Admin.User+"@"+Node.Admin.IP+":/root/.bashrc").CombinedOutput()
-	fmt.Println(fmt.Sprintf("%s", string(out)))
-	err = os.Remove("temp")
-	if err != nil {
-		fmt.Printf("Bad! couldn't delete the temp file: %s", err)
-	}
-
-	fmt.Println(SimpleShellExec(Node, []string{"source", ".bashrc"}))
-
-	out1 := SimpleShellExec(Node, []string{"alias"})
-	if !(strings.Contains(out1, "name=salt-master")) {
-		fmt.Println("Bad!")
-	} else {
-		fmt.Println("alias is set fine...")
-	}
-
-	time.Sleep(2 * time.Second)
-	out1 = SimpleShellExec(Node, []string{"salt-cluster", "saltutil.refresh_grains", ">log"})
-	out1 = SimpleShellExec(Node, []string{"cat", "log"})
+	out1 := SimpleShellExec(Node, []string{"saltutil.refresh_grains"}, "alias")
 	fmt.Println(out1)
 }
 
