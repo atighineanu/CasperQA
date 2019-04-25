@@ -1,0 +1,5 @@
+#!/bin/bash
+sshpass -p {{.Admin.Pass}} ssh-copy-id -f -o StrictHostKeyChecking=no {{.Admin.User}}@{{.Admin.IP}}
+sshpass -p {{.Master.Pass}} ssh-copy-id -f -o StrictHostKeyChecking=no {{.Master.User}}@{{.Master.IP}}
+sshpass -p {{.Worker1.Pass}} ssh-copy-id -f -o StrictHostKeyChecking=no {{.Worker1.User}}@{{.Worker1.IP}}
+sshpass -p {{.Worker2.Pass}} ssh-copy-id -f -o StrictHostKeyChecking=no {{.Worker2.User}}@{{.Worker2.IP}}
