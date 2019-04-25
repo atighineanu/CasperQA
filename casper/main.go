@@ -1,7 +1,7 @@
 package main
 
 import (
-	"CaaSP3_QA_Auto/utils"
+	"CasperQA/utils"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -215,12 +215,32 @@ func AdminOrchestrator(Node Configuration) {
 				out1 := SimpleShellExec(Node, []string{"cmd.run", "'/usr/sbin/transactional-update", "cleanup", "dup", "salt'"}, "alias")
 				fmt.Println(out1)
 			}
+			if os.Args[i] == "ar" && len(os.Args) > i+1 && strings.Contains(os.Args[i+1], ".repo") {
+				out1 := SimpleShellExec(Node, []string{"cmd.run", "'zypper", "ar", os.Args[i+1] + "'"}, "alias")
+				fmt.Println(out1)
+			}
+			if os.Args[i] == "upd" {
+				out1 := SimpleShellExec(Node, []string{"cmd.run", "'/usr/sbin/transactional-update", "cleanup", "dup", "salt'"}, "alias")
+				fmt.Println(out1)
+			}
+			if os.Args[i] == "cmd" {
+				temp := os.Args[2:]
+				temp[0] = "'" + temp[0]
+				temp[len(temp)-1] = temp[len(temp)-1] + "'"
+				temp = append(temp, temp[len(temp)-1])
+				for i := len(temp) - 1; i > 0; i-- {
+					temp[i] = temp[i-1]
+				}
+				temp[0] = "cmd.run"
+				out1 := SimpleShellExec(Node, temp, "alias")
+				fmt.Println(out1)
+			}
 		}
 	}
 }
 
 func main() {
-	Dir = "/home/atighineanu/golang/src/CaaSP3_QA_Auto/"
+	Dir = "/home/atighineanu/golang/src/CasperQA/"
 	var out []byte
 	configuration := Configuration{}
 	file, _ := os.Open(Dir + "utils/config.json")
