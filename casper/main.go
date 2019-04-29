@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -29,65 +30,21 @@ type SSHInfo struct {
 
 var Dir string
 
-//-----------------------------AGOUTI PART----------------------------------------------
-/*
-func ErrorChecker(err error, place string) {
-	if err != nil {
-		fmt.Printf("test encountered an error at\t"+place+"\n%s\n", err)
-	}
-}
-
-func Clicker(button string, page *agouti.Page) (*agouti.Selection, error) {
-	time.Sleep(2 * time.Second)
-	element := page.FindByXPath(button)
-	err := element.Click()
-	return element, err
-}
-
-func Login(linku string, page *agouti.Page) {
-	element, err := Clicker("//*[@id=\"user_email\"]", page)
-	place := "user login"
-	ErrorChecker(err, place)
-
-	err = element.Fill("test@test.com")
-	place = "typing user name"
-	ErrorChecker(err, place)
-
-	element, err = Clicker("//*[@id=\"user_password\"]", page)
-	place = "password login"
-	ErrorChecker(err, place)
-
-	err = element.Fill("password")
-	place = "typing password"
-	ErrorChecker(err, place)
-
-	element, err = Clicker("//*[@class=\"Log in\"]/input[3]", page)
-	place = "clicking \"LOGIN\" "
-	ErrorChecker(err, place)
-}
-
-func PageRefresher(linku string, Driver *agouti.WebDriver) *agouti.Page {
-	page, err := Driver.NewPage(agouti.Browser("chrome"))
-	if err != nil {
-		t.Fatal("Failed to open page:", err)
-	}
-
-	if err := page.Navigate(linku); err != nil {
-		fmt.Printf("Error!...%s", err)
-	}
-	return page
-}
-
-func Runner(ip string) {
-	linku := "https://" + ip
-	Driver := agouti.ChromeDriver()
-	page := PageRefresher(linku, Driver)
-	Login(linku, page)
-}
-*/
-//------------------END OF AGOUTI PART--------------------------------------------
-
 func Keyloader(configuration Configuration) *exec.Cmd {
+
+	out, err := exec.Command("eval", "`ssh-agent`").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Eval didn't work...%s", err)
+	}
+
+	if !strings.Contains(fmt.Sprintf("%s", string(out)), "pid") {
+		log.Fatalf("Bad ssh-agent check!")
+	}
+
+	err = exec.Command("ssh-add").Run()
+	if err != nil {
+		log.Fatalf("ssh-add didn't work...%s", err)
+	}
 
 	templ, err := template.ParseFiles(Dir + "utils/keyload.template")
 	if err != nil {
@@ -104,7 +61,7 @@ func Keyloader(configuration Configuration) *exec.Cmd {
 	if err != nil {
 		log.Fatalf("couldn't execute command...%s", err)
 	}
-	out, err := exec.Command("ls", "-alh", Dir+"utils/").CombinedOutput()
+	out, err = exec.Command("ls", "-alh", Dir+"utils/").CombinedOutput()
 	if err != nil {
 		log.Fatalf("couldn't execute command...%s", err)
 	}
@@ -115,7 +72,6 @@ func Keyloader(configuration Configuration) *exec.Cmd {
 		}
 	}
 	time.Sleep(5 * time.Second)
-
 	return exec.Command(Dir + "utils/keyloader.sh")
 }
 
@@ -141,63 +97,86 @@ func SimpleShellExec(Node Configuration, cmd []string, flag string) string {
 		}
 		fmt.Printf("%s", string(out))
 	} else {
-		out, err := Node.Admin.Command(cmd...).CombinedOutput()
-		if err != nil {
-			fmt.Println("This is bad! ", cmd, "didn't work:", err)
+		if flag == "admin" {
+			out, err := Node.Admin.Command(cmd...).CombinedOutput()
+			if err != nil {
+				fmt.Println("This is bad! ", cmd, "didn't work:", err)
+			}
+			fmt.Printf("%s", string(out))
 		}
-		fmt.Printf("%s", string(out))
+		if flag == "master" {
+			out, err := Node.Master.Command(cmd...).CombinedOutput()
+			if err != nil {
+				fmt.Println("This is bad! ", cmd, "didn't work:", err)
+			}
+			fmt.Printf("%s", string(out))
+		}
+		if flag == "worker1" {
+			out, err := Node.Worker1.Command(cmd...).CombinedOutput()
+			if err != nil {
+				fmt.Println("This is bad! ", cmd, "didn't work:", err)
+			}
+			fmt.Printf("%s", string(out))
+		}
+		if flag == "worker2" {
+			out, err := Node.Worker2.Command(cmd...).CombinedOutput()
+			if err != nil {
+				fmt.Println("This is bad! ", cmd, "didn't work:", err)
+			}
+			fmt.Printf("%s", string(out))
+		}
+
 	}
 	return fmt.Sprintf("%s", out)
 }
 
+func TransUpdConfigChecker(Node Configuration) {
+	a := []string{"admin", "master", "worker1", "worker2"}
+	for i := 0; i < len(a); i++ {
+		out := SimpleShellExec(Node, []string{"cat", "/etc/transactional-update.conf"}, a[i])
+		var mux sync.Mutex
+		if !strings.Contains(out, "ZYPPER_AUTO_IMPORT_KEYS=1") {
+			mux.Lock()
+			SimpleShellExec(Node, []string{"echo", "'ZYPPER_AUTO_IMPORT_KEYS=1'", ">>", "/etc/transactional-update.conf"}, a[i])
+		}
+		mux.Unlock()
+		if !strings.Contains(SimpleShellExec(Node, []string{"cat", "/etc/transactional-update.conf"}, a[i]), "ZYPPER_AUTO_IMPORT_KEYS=1") {
+			fmt.Printf("Bad! Config Didn't Work at %s\n", a[i])
+		}
+	}
+}
+
 func AdminOrchestrator(Node Configuration) {
 
-	//------------------when puttin' alias into .bashrc===> OBSOLETE-----------------------------------
-	/*
-			expr := []byte("alias salt-cluster='docker exec $(docker ps -q --filter name=salt-master) salt -P \"roles:admin|kube-master|kube-minion\"'")
-			var f *os.File
-			f, err := os.Create("temp")
-			if err != nil {
-				log.Fatalf("couldn't create the file...%s", err)
-			}
-			f.Write(expr)
-			f.Close()
-			out, err := exec.Command("scp", "-o", "StrictHostKeyChecking=no", "temp", Node.Admin.User+"@"+Node.Admin.IP+":/root/.bashrc").CombinedOutput()
-			fmt.Println(fmt.Sprintf("%s", string(out)))
-			err = os.Remove("temp")
-			if err != nil {
-				fmt.Printf("Bad! couldn't delete the temp file: %s", err)
-			}
-			fmt.Println(SimpleShellExec(Node, []string{"source", ".bashrc"}))
-		out1 := SimpleShellExec(Node, []string{"alias"})
-		if !(strings.Contains(out1, "name=salt-master")) {
-			fmt.Println("Bad!")
-		} else {
-			fmt.Println("alias is set fine...")
-		}
-	*/
-
 	if len(os.Args) <= 1 || (len(os.Args) > 1 && os.Args[1] == "new") {
+		var mux sync.Mutex
 		//------------Refresh Salt Grains
+		mux.Lock()
 		out1 := SimpleShellExec(Node, []string{"saltutil.refresh_grains"}, "alias")
 		fmt.Println(out1)
-
+		mux.Unlock()
 		//------------Registering Nodes
+		mux.Lock()
 		out1 = SimpleShellExec(Node, []string{"cmd.run", "'transactional-update", "register", "-r", Node.Key + "'"}, "alias")
 		fmt.Println(out1)
-
+		mux.Unlock()
 		//------------Disabling Update.Timer
+		mux.Lock()
 		out1 = SimpleShellExec(Node, []string{"cmd.run", "'systemctl", "disable", "--now", "transactional-update.timer'"}, "alias")
 		fmt.Println(out1)
-
+		mux.Unlock()
 		//----------------Updating With Salt
+		mux.Lock()
 		out1 = SimpleShellExec(Node, []string{"cmd.run", "'/usr/sbin/transactional-update", "cleanup", "dup", "salt'"}, "alias")
 		fmt.Println(out1)
-
+		mux.Unlock()
 		//------------------Refreshing Grains Again...
+		mux.Lock()
 		out1 = SimpleShellExec(Node, []string{"saltutil.refresh_grains"}, "alias")
 		fmt.Println(out1)
+		mux.Unlock()
 	} else {
+
 		for i := 0; i < len(os.Args); i++ {
 			if os.Args[i] == "ref" {
 				out1 := SimpleShellExec(Node, []string{"saltutil.refresh_grains"}, "alias")
@@ -211,7 +190,7 @@ func AdminOrchestrator(Node Configuration) {
 				out1 := SimpleShellExec(Node, []string{"cmd.run", "'systemctl", "disable", "--now", "transactional-update.timer'"}, "alias")
 				fmt.Println(out1)
 			}
-			if os.Args[i] == "upd" {
+			if os.Args[i] == "supd" {
 				out1 := SimpleShellExec(Node, []string{"cmd.run", "'/usr/sbin/transactional-update", "cleanup", "dup", "salt'"}, "alias")
 				fmt.Println(out1)
 			}
@@ -219,9 +198,12 @@ func AdminOrchestrator(Node Configuration) {
 				out1 := SimpleShellExec(Node, []string{"cmd.run", "'zypper", "ar", os.Args[i+1] + "'"}, "alias")
 				fmt.Println(out1)
 			}
-			if os.Args[i] == "upd" {
-				out1 := SimpleShellExec(Node, []string{"cmd.run", "'/usr/sbin/transactional-update", "cleanup", "dup", "salt'"}, "alias")
-				fmt.Println(out1)
+			if os.Args[i] == "pupd" {
+				TransUpdConfigChecker(Node)
+				if len(os.Args) > i+1 {
+					out1 := SimpleShellExec(Node, []string{"cmd.run", "'/usr/sbin/transactional-update", "reboot", "pkg", "install", "-y", os.Args[i+1] + "'"}, "alias")
+					fmt.Println(out1)
+				}
 			}
 			if os.Args[i] == "cmd" {
 				temp := os.Args[2:]
@@ -231,6 +213,7 @@ func AdminOrchestrator(Node Configuration) {
 				for i := len(temp) - 1; i > 0; i-- {
 					temp[i] = temp[i-1]
 				}
+
 				temp[0] = "cmd.run"
 				out1 := SimpleShellExec(Node, temp, "alias")
 				fmt.Println(out1)
@@ -240,7 +223,6 @@ func AdminOrchestrator(Node Configuration) {
 }
 
 func main() {
-	Dir = "/home/atighineanu/golang/src/CasperQA/"
 	var out []byte
 	configuration := Configuration{}
 	file, _ := os.Open(Dir + "utils/config.json")
@@ -259,7 +241,7 @@ func main() {
 		}
 		Dir = strings.Replace(fmt.Sprintf("%s", string(out)), "\n", "", -1)
 		out, _ = exec.Command("ls", "-alh", Dir).CombinedOutput()
-		if !(strings.Contains(fmt.Sprintf("%s", string(out)), "utils/config.json")) {
+		if !(strings.Contains(fmt.Sprintf("%s", string(out)), "utils")) {
 			fmt.Println("This is bad! please fix your running folder!--->config.json--->Dir")
 		}
 	} else {
@@ -268,7 +250,6 @@ func main() {
 
 	// KEYLOADER PART----------------------------------------
 
-	AdminOrchestrator(configuration)
 	if len(os.Args) > 1 {
 		if os.Args[1] == "new" {
 			out, err = Keyloader(configuration).CombinedOutput()
@@ -287,17 +268,5 @@ func main() {
 		}
 	}
 	// END OF KEYLOADER PART----------------------------------
-
-	/*
-		cmd := []string{"ls", "-alh"}
-		out, _ = configuration.Admin.Command(cmd...).CombinedOutput()
-		fmt.Printf("%s", string(out))
-		out, _ = configuration.Master.Command(cmd...).CombinedOutput()
-		fmt.Printf("%s", string(out))
-		out, _ = configuration.Worker1.Command(cmd...).CombinedOutput()
-		fmt.Printf("%s", string(out))
-		out, _ = configuration.Worker2.Command(cmd...).CombinedOutput()
-		fmt.Printf("%s", string(out))
-	*/
-
+	AdminOrchestrator(configuration)
 }
