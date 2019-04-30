@@ -6,6 +6,6 @@
  * "supd" - <salt update> - 'transactional-update cleanup dup salt'; syntax: go run main.go supd
  * "pupd" - <package update> 'transactional-update reboot pkg install -y <package name>' (it sets automatically the "ZYPPER_AUTO_IMPORT_KEYS=1" option in /etc/transactional-update.conf; syntax: go run main.go pupd <package name>
  * "cmd" - <command> - salt-cluster <command>;    syntax: go run main.go cmd <command with more arguments>
- * "ar" - <addrepo> - salt-cluster 'zypper ar <your rempo>;  syntax: go run main.go ar <.repo>
+ * "ar" - <addrepo> - salt-cluster 'zypper ar <your rempo>);  syntax: go run main.go ar <.repo>
  * "dis" - <disable timer> - salt-cluster 'disable trans. upd. timer'
  * "setup" - <setup> - sets up a new caasp3.0 cluster on libvirt-terraform (so far)
